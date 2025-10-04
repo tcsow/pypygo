@@ -1,0 +1,337 @@
+services:
+  # MySQL 服務
+  mysql:
+    image: mysql:8.0
+    platform: linux/arm64
+    container_name: pypygo-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes:
+      # 資料持久化
+      - "mysql-data:/var/lib/mysql"
+      # 初始化腳本
+      - "./mysql/01-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro"
+      - "./mysql/02-data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro"
+      # 自訂配置
+      - "./mysql/my.cnf:/etc/mysql/conf.d/my.cnf"
+    networks:
+      - pypygo-network
+
+
+  redis-master:
+    image: redis:7-alpine
+    platform: linux/arm64
+    container_name: pypygo-redis-master
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-master-data:/data
+      - ./redis/redis-master.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      pypygo-network:
+        ipv4_address: 172.20.0.10
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_password_123", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis-slave-1:
+    image: redis:7-alpine
+    platform: linux/arm64
+    container_name: pypygo-redis-slave-1
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-slave-1-data:/data
+      - ./redis/redis-slave.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      pypygo-network:
+        ipv4_address: 172.20.0.11
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_password_123", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis-slave-2:
+    image: redis:7-alpine
+    platform: linux/arm64
+    container_name: pypygo-redis-slave-2
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis-slave-2-data:/data
+      - ./redis/redis-slave.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      pypygo-network:
+        ipv4_address: 172.20.0.12
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_password_123", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis-sentinel-1:
+    image: redis:7-alpine
+    platform: linux/arm64
+    container_name: pypygo-sentinel-1
+    command: sh -c "sleep 15 && redis-sentinel /etc/redis/sentinel.conf"
+    ports:
+      - "26379:26379"
+    volumes:
+      - sentinel-1-data:/data
+      - ./redis/sentinel1.conf:/etc/redis/sentinel.conf
+    networks:
+      pypygo-network:
+        ipv4_address: 172.20.0.20
+    depends_on:
+      redis-master:
+        condition: service_healthy
+      redis-slave-1:
+        condition: service_healthy
+      redis-slave-2:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis-sentinel-2:
+    image: redis:7-alpine
+    platform: linux/arm64
+    container_name: pypygo-sentinel-2
+    command: sh -c "sleep 15 && redis-sentinel /etc/redis/sentinel.conf"
+    ports:
+      - "26380:26379"
+    volumes:
+      - sentinel-2-data:/data
+      - ./redis/sentinel2.conf:/etc/redis/sentinel.conf
+    networks:
+      pypygo-network:
+        ipv4_address: 172.20.0.21
+    depends_on:
+      redis-master:
+        condition: service_healthy
+      redis-slave-1:
+        condition: service_healthy
+      redis-slave-2:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis-sentinel-3:
+    image: redis:7-alpine
+    platform: linux/arm64
+    container_name: pypygo-sentinel-3
+    command: sh -c "sleep 15 && redis-sentinel /etc/redis/sentinel.conf"
+    ports:
+      - "26381:26379"
+    volumes:
+      - sentinel-3-data:/data
+      - ./redis/sentinel3.conf:/etc/redis/sentinel.conf
+
+
+
+    # ========== Redis Cluster 架構 ==========
+  redis-cluster-1:
+    image: redis:7-alpine
+    platform: linux/arm64
+    container_name: pypygo-cluster-1
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "7001:7001"
+      - "17001:17001"
+    volumes:
+      - redis-cluster-1-data:/data
+      - ./redis/cluster/redis-cluster-1.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      pypygo-network:
+        ipv4_address: 172.20.0.31
+    restart: unless-stopped
+
+  redis-cluster-2:
+    image: redis:7-alpine
+    platform: linux/arm64
+    container_name: pypygo-cluster-2
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "7002:7002"
+      - "17002:17002"
+    volumes:
+      - redis-cluster-2-data:/data
+      - ./redis/cluster/redis-cluster-2.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      pypygo-network:
+        ipv4_address: 172.20.0.32
+    restart: unless-stopped
+
+  redis-cluster-3:
+    image: redis:7-alpine
+    platform: linux/arm64
+    container_name: pypygo-cluster-3
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "7003:7003"
+      - "17003:17003"
+    volumes:
+      - redis-cluster-3-data:/data
+      - ./redis/cluster/redis-cluster-3.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      pypygo-network:
+        ipv4_address: 172.20.0.33
+    restart: unless-stopped
+
+  redis-cluster-4:
+    image: redis:7-alpine
+    platform: linux/arm64
+    container_name: pypygo-cluster-4
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "7004:7004"
+      - "17004:17004"
+    volumes:
+      - redis-cluster-4-data:/data
+      - ./redis/cluster/redis-cluster-4.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      pypygo-network:
+        ipv4_address: 172.20.0.34
+    restart: unless-stopped
+
+  redis-cluster-5:
+    image: redis:7-alpine
+    platform: linux/arm64
+    container_name: pypygo-cluster-5
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "7005:7005"
+      - "17005:17005"
+    volumes:
+      - redis-cluster-5-data:/data
+      - ./redis/cluster/redis-cluster-5.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      pypygo-network:
+        ipv4_address: 172.20.0.35
+    restart: unless-stopped
+
+  redis-cluster-6:
+    image: redis:7-alpine
+    platform: linux/arm64
+    container_name: pypygo-cluster-6
+    command: redis-server /usr/local/etc/redis/redis.conf
+    ports:
+      - "7006:7006"
+      - "17006:17006"
+    volumes:
+      - redis-cluster-6-data:/data
+      - ./redis/cluster/redis-cluster-6.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      pypygo-network:
+        ipv4_address: 172.20.0.36
+    restart: unless-stopped
+
+  # ========== Cluster 初始化容器 ==========
+  redis-cluster-init:
+    image: redis:7-alpine
+    platform: linux/arm64
+    container_name: pypygo-cluster-init
+    command:
+      - sh
+      - -c
+      - |
+        echo "Waiting for all cluster nodes to be ready..."
+        sleep 20
+        echo "Creating Redis Cluster..."
+        redis-cli -a redis_password_123 --cluster create 172.20.0.31:7001 172.20.0.32:7002 172.20.0.33:7003 172.20.0.34:7004 172.20.0.35:7005 172.20.0.36:7006 --cluster-replicas 1 --cluster-yes
+        echo "Cluster created successfully!"
+    networks:
+      - pypygo-network
+    depends_on:
+      - redis-cluster-1
+      - redis-cluster-2
+      - redis-cluster-3
+      - redis-cluster-4
+      - redis-cluster-5
+      - redis-cluster-6
+    restart: "no"
+
+  # ========== RabbitMQ 服務 ==========
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    platform: linux/arm64
+    container_name: pypygo-rabbitmq
+    hostname: pypygo-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"   # AMQP 協議端口
+      - "15672:15672" # 管理界面端口
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - rabbitmq-logs:/var/log/rabbitmq
+    networks:
+      pypygo-network:
+        ipv4_address: 172.20.0.40
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+
+
+    # ========== network setting ==========
+volumes:
+  mysql-data:
+    driver: local
+  redis-master-data:
+    driver: local
+  redis-slave-1-data:
+    driver: local
+  redis-slave-2-data:
+    driver: local
+  sentinel-1-data:
+    driver: local
+  sentinel-2-data:
+    driver: local
+  sentinel-3-data:
+    driver: local
+  redis-cluster-1-data:
+    driver: local
+  redis-cluster-2-data:
+    driver: local
+  redis-cluster-3-data:
+    driver: local
+  redis-cluster-4-data:
+    driver: local
+  redis-cluster-5-data:
+    driver: local
+  redis-cluster-6-data:
+    driver: local
+  rabbitmq-data:
+    driver: local
+  rabbitmq-logs:
+    driver: local
+
+networks:
+  pypygo-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

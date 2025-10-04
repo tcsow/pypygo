@@ -1,0 +1,25 @@
+server:
+  port: 8091
+spring:
+  application:
+    name: pypygo
+  datasource:
+    url: jdbc:mysql://localhost:3307/pypygo
+    username: root
+    password: password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  messages:
+    basename: messages
+    encoding: UTF-8
+    cache-duration: 3600
+  web:
+    locale: en
+    locale-resolver: accept_header
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+    open-in-view: false
