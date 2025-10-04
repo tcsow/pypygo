@@ -1,20 +1,20 @@
 server:
   port: 8091
+
 spring:
   application:
     name: pypygo
+
   datasource:
     url: jdbc:mysql://localhost:3307/pypygo
     username: root
     password: password
     driver-class-name: com.mysql.cj.jdbc.Driver
-  messages:
-    basename: messages
-    encoding: UTF-8
-    cache-duration: 3600
-  web:
-    locale: en
-    locale-resolver: accept_header
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+
   jpa:
     hibernate:
       ddl-auto: none
@@ -23,3 +23,53 @@ spring:
       hibernate:
         format_sql: false
     open-in-view: false
+
+  messages:
+    basename: messages
+    encoding: UTF-8
+    cache-duration: 3600
+
+  web:
+    locale: en
+    locale-resolver: accept_header
+
+  # Redis Sentinel 配置
+  data:
+    redis:
+      password: redis_password_123
+      sentinel:
+        master: mymaster
+        nodes:
+          - localhost:26379
+          - localhost:26380
+          - localhost:26381
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 2
+          max-wait: -1ms
+        shutdown-timeout: 100ms
+
+  # RabbitMQ 配置
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: admin
+    password: admin123
+    virtual-host: /
+    listener:
+      simple:
+        acknowledge-mode: manual
+        prefetch: 1
+        retry:
+          enabled: true
+          initial-interval: 3000
+          max-attempts: 3
+          multiplier: 2
+    template:
+      retry:
+        enabled: true
+        initial-interval: 1000
+        max-attempts: 3
+        multiplier: 2
